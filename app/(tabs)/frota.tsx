@@ -1,8 +1,14 @@
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Card, Chip, Divider, Menu, Text } from 'react-native-paper';
-// Importa a nova função de atualização automática
+import {
+  Alert,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Vibration,
+  View,
+} from 'react-native';
+import { Button, Card, Chip, Divider, Surface, Text } from 'react-native-paper';
 import {
   atualizarLocacoesVencidasAutomaticamente,
   atualizarStatusCarro,
@@ -10,13 +16,11 @@ import {
 } from '../../src/database/queries';
 
 export default function FrotaScreen() {
-  const [carros, setCarros] = useState<any[]>([]);
-  const [carrosFiltrados, setCarrosFiltrados] = useState<any[]>([]);
+  const [carros, setCarros] = useState([]);
+  const [carrosFiltrados, setCarrosFiltrados] = useState([]);
   const [filtroStatus, setFiltroStatus] = useState('todos');
   const [refreshing, setRefreshing] = useState(false);
-  const [menuAberto, setMenuAberto] = useState<number | null>(null);
 
-  // Recarregar sempre que a tela ficar em foco
   useFocusEffect(
     React.useCallback(() => {
       carregarCarros();
@@ -29,50 +33,60 @@ export default function FrotaScreen() {
 
   const carregarCarros = async () => {
     try {
-      // *** ATUALIZAÇÃO APLICADA AQUI ***
-      // Primeiro, atualiza locações vencidas e pagas para "finalizada"
       await atualizarLocacoesVencidasAutomaticamente();
-      
-      // Depois, carrega a lista de carros com os status corretos
       const dados = await listarCarrosComStatus();
       setCarros(dados);
     } catch (error) {
       console.error('Erro ao carregar carros:', error);
+      Alert.alert('❌ Erro', 'Não foi possível carregar a frota. Tente novamente.');
     }
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await carregarCarros(); // Esta função agora também faz a atualização automática
+    await carregarCarros();
     setRefreshing(false);
+    Vibration.vibrate(50);
   };
 
   const aplicarFiltro = () => {
     if (filtroStatus === 'todos') {
       setCarrosFiltrados(carros);
     } else {
-      setCarrosFiltrados(carros.filter(c => c.status === filtroStatus));
+      setCarrosFiltrados(carros.filter((c: any) => c.status === filtroStatus));
     }
   };
 
   const handleAlterarStatus = async (carroId: number, novoStatus: string, modelo: string) => {
-    // Fecha o menu imediatamente
-    setMenuAberto(null);
-    
+    Vibration.vibrate(50);
     Alert.alert(
-      '🔧 Alterar Status',
-      `Alterar status do ${modelo} para "${getStatusLabel(novoStatus)}"?`,
+      '🔧 Alterar Status do Veículo',
+      `Você está alterando o status de:\n\n🚗 ${modelo}\n\nNovo status: ${getStatusLabel(
+        novoStatus
+      )}\n\nDeseja confirmar?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Confirmar',
+          text: 'Sim, Alterar',
+          style: 'default',
           onPress: async () => {
             try {
               await atualizarStatusCarro(carroId, novoStatus);
-              Alert.alert('✅ Sucesso', 'Status atualizado com sucesso!');
+              Vibration.vibrate(200);
+              Alert.alert(
+                '✅ Status Atualizado',
+                `O status do veículo foi alterado com sucesso!\n\n🚗 ${modelo}\n📊 Novo status: ${getStatusLabel(
+                  novoStatus
+                )}`,
+                [{ text: 'Ok, Entendi', style: 'default' }]
+              );
               await carregarCarros();
             } catch (error: any) {
-              Alert.alert('❌ Erro', 'Erro ao atualizar status: ' + error.message);
+              Alert.alert(
+                '❌ Erro ao Atualizar',
+                `Não foi possível atualizar o status:\n\n${error.message}`,
+                [{ text: 'Entendi', style: 'default' }]
+              );
             }
           },
         },
@@ -120,160 +134,206 @@ export default function FrotaScreen() {
   };
 
   const calcularTotalPorStatus = (status: string) => {
-    // Usamos um Set para contar apenas IDs únicos de carros
-    const idsUnicos = new Set(carros.filter(c => c.status === status).map(c => c.id));
+    const idsUnicos = new Set(carros.filter((c: any) => c.status === status).map((c: any) => c.id));
     return idsUnicos.size;
   };
-  
+
   const calcularTotalFrota = () => {
-    // Usamos um Set para contar o total de IDs únicos de carros
-    const idsUnicos = new Set(carros.map(c => c.id));
+    const idsUnicos = new Set(carros.map((c: any) => c.id));
     return idsUnicos.size;
   };
 
   return (
     <View style={styles.container}>
-      {/* Card de Resumo */}
-      <Card style={styles.resumoCard}>
-        <Card.Content>
-          <Text variant="titleMedium" style={styles.resumoTitulo}>
-            📊 Resumo da Frota
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#6200ee']}
+            title="Puxe para atualizar"
+          />
+        }>
+        {/* Cabeçalho */}
+        <Surface style={styles.headerCard} elevation={4}>
+          <Text style={styles.titulo}>🚗 Frota de Veículos</Text>
+          <Text style={styles.subtitulo}>
+            Gerencie todos os veículos cadastrados e seus status
           </Text>
+        </Surface>
+
+        {/* Card de Resumo */}
+        <Surface style={styles.resumoCard} elevation={4}>
+          <Text style={styles.resumoTitulo}>📊 Resumo da Frota</Text>
+          <Divider style={styles.dividerResumo} />
           <View style={styles.resumoRow}>
             <View style={styles.resumoItem}>
-              <Text style={styles.resumoNumero}>{calcularTotalPorStatus('disponivel')}</Text>
-              <Text style={styles.resumoLabel}>Disponíveis</Text>
+              <Text style={[styles.resumoNumero, { color: '#4CAF50' }]}>
+                {calcularTotalPorStatus('disponivel')}
+              </Text>
+              <Text style={styles.resumoLabel}>✅ Disponíveis</Text>
             </View>
             <View style={styles.resumoItem}>
-              <Text style={styles.resumoNumero}>{calcularTotalPorStatus('alugado')}</Text>
-              <Text style={styles.resumoLabel}>Alugados</Text>
+              <Text style={[styles.resumoNumero, { color: '#FF9800' }]}>
+                {calcularTotalPorStatus('alugado')}
+              </Text>
+              <Text style={styles.resumoLabel}>🚗 Alugados</Text>
             </View>
             <View style={styles.resumoItem}>
-              <Text style={styles.resumoNumero}>{calcularTotalPorStatus('manutencao')}</Text>
-              <Text style={styles.resumoLabel}>Manutenção</Text>
+              <Text style={[styles.resumoNumero, { color: '#f44336' }]}>
+                {calcularTotalPorStatus('manutencao')}
+              </Text>
+              <Text style={styles.resumoLabel}>🔧 Manutenção</Text>
             </View>
           </View>
-        </Card.Content>
-      </Card>
+        </Surface>
 
-      {/* Filtros */}
-      <Card style={styles.filtroCard}>
-        <Card.Content>
-          <Text variant="titleSmall" style={styles.filtroTitulo}>
-            Filtrar por Status:
-          </Text>
+        {/* Filtros */}
+        <Surface style={styles.filtroCard} elevation={3}>
+          <Text style={styles.filtroTitulo}>🔍 Filtrar por Status:</Text>
           <View style={styles.filtroRow}>
             <Chip
               selected={filtroStatus === 'todos'}
-              onPress={() => setFiltroStatus('todos')}
+              onPress={() => {
+                Vibration.vibrate(30);
+                setFiltroStatus('todos');
+              }}
               style={styles.chip}
-            >
+              textStyle={styles.chipText}>
               Todos ({calcularTotalFrota()})
             </Chip>
             <Chip
               selected={filtroStatus === 'disponivel'}
-              onPress={() => setFiltroStatus('disponivel')}
+              onPress={() => {
+                Vibration.vibrate(30);
+                setFiltroStatus('disponivel');
+              }}
               style={styles.chip}
-            >
+              textStyle={styles.chipText}
+              icon="check-circle">
               Disponíveis
             </Chip>
             <Chip
               selected={filtroStatus === 'alugado'}
-              onPress={() => setFiltroStatus('alugado')}
+              onPress={() => {
+                Vibration.vibrate(30);
+                setFiltroStatus('alugado');
+              }}
               style={styles.chip}
-            >
+              textStyle={styles.chipText}
+              icon="car">
               Alugados
             </Chip>
             <Chip
               selected={filtroStatus === 'manutencao'}
-              onPress={() => setFiltroStatus('manutencao')}
+              onPress={() => {
+                Vibration.vibrate(30);
+                setFiltroStatus('manutencao');
+              }}
               style={styles.chip}
-            >
+              textStyle={styles.chipText}
+              icon="wrench">
               Manutenção
             </Chip>
           </View>
-        </Card.Content>
-      </Card>
+        </Surface>
 
-      {/* Lista de Carros */}
-      <ScrollView
-        style={styles.scrollView}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
+        {/* Lista de Carros */}
         {carrosFiltrados.length === 0 ? (
           <Card style={styles.emptyCard}>
             <Card.Content>
               <Text style={styles.emptyText}>
-                Nenhum carro encontrado com este filtro
+                {filtroStatus === 'todos'
+                  ? '📋 Nenhum veículo cadastrado'
+                  : `📋 Nenhum veículo ${getStatusLabel(filtroStatus).toLowerCase()}`}
+              </Text>
+              <Text style={styles.emptySubtext}>
+                {filtroStatus === 'todos'
+                  ? 'Cadastre veículos na aba "Novo" para começar'
+                  : 'Tente outro filtro ou altere o status dos veículos'}
               </Text>
             </Card.Content>
           </Card>
         ) : (
-          carrosFiltrados.map((carro) => (
-            <Card 
-              key={`${carro.id}-${carro.locacao_id || 'disponivel'}`} 
-              style={styles.carroCard}
-            >
+          carrosFiltrados.map((carro: any) => (
+            <Card key={carro.id} style={styles.carroCard}>
               <Card.Content>
+                {/* Header do Card */}
                 <View style={styles.carroHeader}>
                   <View style={styles.carroInfo}>
-                    <Text variant="titleLarge" style={styles.carroModelo}>
+                    <Text style={styles.carroModelo}>
                       {getStatusIcon(carro.status)} {carro.modelo}
                     </Text>
-                    <Text variant="bodyMedium">📋 Placa: {carro.placa}</Text>
+                    <Text style={styles.carroPlaca}>📋 Placa: {carro.placa}</Text>
+                    <Text style={styles.carroDiaria}>
+                      💰 R$ {carro.valor_diaria.toFixed(2)}/dia
+                    </Text>
                   </View>
                   <Chip
+                    mode="flat"
                     style={[styles.statusChip, { backgroundColor: getStatusColor(carro.status) }]}
-                    textStyle={styles.statusChipText}
-                  >
+                    textStyle={styles.statusChipText}>
                     {getStatusLabel(carro.status)}
                   </Chip>
                 </View>
 
-                <Divider style={styles.divider} />
-
-                {/* Informações adicionais se estiver alugado */}
+                {/* Informações de Locação se alugado */}
                 {carro.status === 'alugado' && carro.cliente && (
-                  <View style={styles.locacaoInfo}>
-                    <Text variant="bodySmall" style={styles.locacaoLabel}>
-                      👤 Cliente: {carro.cliente}
-                    </Text>
-                    <Text variant="bodySmall" style={styles.locacaoLabel}>
-                      🏁 Devolução: {new Date(carro.data_fim).toLocaleDateString('pt-BR')} às {carro.hora_fim}
-                    </Text>
-                  </View>
+                  <>
+                    <Divider style={styles.divider} />
+                    <Surface style={styles.locacaoInfo} elevation={1}>
+                      <Text style={styles.locacaoTitulo}>📍 Locação Atual</Text>
+                      <Text style={styles.locacaoLabel}>👤 Cliente: {carro.cliente}</Text>
+                      <Text style={styles.locacaoLabel}>
+                        📅 Início:{' '}
+                        {new Date(carro.data_inicio).toLocaleDateString('pt-BR')} às{' '}
+                        {carro.hora_inicio}
+                      </Text>
+                      <Text style={styles.locacaoLabel}>
+                        🏁 Devolução:{' '}
+                        {new Date(carro.data_fim).toLocaleDateString('pt-BR')} às {carro.hora_fim}
+                      </Text>
+                    </Surface>
+                  </>
                 )}
 
-                {/* Botão de alterar status */}
-                <Menu
-                  visible={menuAberto === carro.id}
-                  onDismiss={() => setMenuAberto(null)}
-                  anchor={
-                    <Button
-                      mode="outlined"
-                      icon="cog"
-                      onPress={() => setMenuAberto(carro.id)}
-                      style={styles.botaoStatus}
-                    >
-                      Alterar Status
-                    </Button>
-                  }
-                >
-                  <Menu.Item
-                    leadingIcon="check-circle"
-                    onPress={() => handleAlterarStatus(carro.id, 'disponivel', carro.modelo)}
-                    title="Disponível"
-                    disabled={carro.status === 'disponivel'}
-                  />
-                  <Menu.Item
-                    leadingIcon="wrench"
-                    onPress={() => handleAlterarStatus(carro.id, 'manutencao', carro.modelo)}
-                    title="Em Manutenção"
-                    disabled={carro.status === 'manutencao'}
-                  />
-                </Menu>
+                <Divider style={styles.dividerAcoes} />
+
+                {/* Botões de Ação */}
+                <View style={styles.acoesContainer}>
+                  <Text style={styles.acoesLabel}>Alterar Status Para:</Text>
+                  <View style={styles.botoesRow}>
+                    {carro.status !== 'disponivel' && (
+                      <Button
+                        mode="contained-tonal"
+                        icon="check-circle"
+                        onPress={() =>
+                          handleAlterarStatus(carro.id, 'disponivel', carro.modelo)
+                        }
+                        style={[styles.botaoStatus, { backgroundColor: '#e8f5e9' }]}
+                        labelStyle={[styles.botaoStatusLabel, { color: '#2e7d32' }]}
+                        contentStyle={styles.botaoStatusContent}>
+                        Disponível
+                      </Button>
+                    )}
+                    {carro.status !== 'manutencao' && (
+                      <Button
+                        mode="contained-tonal"
+                        icon="wrench"
+                        onPress={() =>
+                          handleAlterarStatus(carro.id, 'manutencao', carro.modelo)
+                        }
+                        style={[styles.botaoStatus, { backgroundColor: '#ffebee' }]}
+                        labelStyle={[styles.botaoStatusLabel, { color: '#c62828' }]}
+                        contentStyle={styles.botaoStatusContent}>
+                        Manutenção
+                      </Button>
+                    )}
+                  </View>
+                </View>
               </Card.Content>
             </Card>
           ))
@@ -288,15 +348,50 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  resumoCard: {
-    margin: 16,
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  headerCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  titulo: {
+    fontSize: 28,
+    fontWeight: 'bold',
     marginBottom: 8,
-    elevation: 4,
+    textAlign: 'center',
+    color: '#333',
+  },
+  subtitulo: {
+    fontSize: 17,
+    textAlign: 'center',
+    color: '#666',
+    lineHeight: 24,
+  },
+  resumoCard: {
+    backgroundColor: '#e3f2fd',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
   },
   resumoTitulo: {
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 12,
     textAlign: 'center',
+    marginBottom: 8,
+    color: '#1565c0',
+  },
+  dividerResumo: {
+    marginBottom: 16,
+    height: 2,
+    backgroundColor: '#64b5f6',
   },
   resumoRow: {
     flexDirection: 'row',
@@ -306,23 +401,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   resumoNumero: {
-    fontSize: 32,
+    fontSize: 40,
     fontWeight: 'bold',
-    color: '#6200ee',
+    marginBottom: 8,
   },
   resumoLabel: {
-    fontSize: 12,
-    color: '#757575',
-    marginTop: 4,
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '600',
   },
   filtroCard: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-    elevation: 2,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
   },
   filtroTitulo: {
-    marginBottom: 8,
+    fontSize: 18,
+    marginBottom: 12,
     fontWeight: 'bold',
+    color: '#333',
   },
   filtroRow: {
     flexDirection: 'row',
@@ -331,57 +429,117 @@ const styles = StyleSheet.create({
   },
   chip: {
     marginBottom: 4,
+    height: 40,
   },
-  scrollView: {
-    flex: 1,
-    padding: 16,
+  chipText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   carroCard: {
-    marginBottom: 12,
+    marginBottom: 16,
     elevation: 4,
+    backgroundColor: '#fff',
   },
   carroHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    marginBottom: 12,
   },
   carroInfo: {
     flex: 1,
+    marginRight: 12,
   },
   carroModelo: {
+    fontSize: 22,
     fontWeight: 'bold',
+    marginBottom: 6,
+    color: '#333',
+  },
+  carroPlaca: {
+    fontSize: 17,
+    color: '#666',
     marginBottom: 4,
   },
+  carroDiaria: {
+    fontSize: 19,
+    fontWeight: '600',
+    color: '#1976d2',
+  },
   statusChip: {
-    marginLeft: 8,
+    height: 36,
+    justifyContent: 'center',
   },
   statusChipText: {
     color: 'white',
     fontWeight: 'bold',
+    fontSize: 14,
   },
   divider: {
     marginVertical: 12,
+    height: 2,
   },
   locacaoInfo: {
-    backgroundColor: '#FFF3E0',
-    padding: 12,
+    backgroundColor: '#fff3e0',
+    padding: 16,
     borderRadius: 8,
     marginBottom: 12,
   },
+  locacaoTitulo: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#e65100',
+    marginBottom: 8,
+  },
   locacaoLabel: {
-    marginBottom: 4,
+    fontSize: 17,
+    marginBottom: 6,
+    color: '#e65100',
+    lineHeight: 24,
+  },
+  dividerAcoes: {
+    marginVertical: 16,
+    height: 2,
+  },
+  acoesContainer: {
+    gap: 12,
+  },
+  acoesLabel: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 8,
+  },
+  botoesRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
   botaoStatus: {
-    marginTop: 8,
+    flex: 1,
+  },
+  botaoStatusLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  botaoStatusContent: {
+    paddingVertical: 8,
   },
   emptyCard: {
-    marginTop: 50,
-    alignItems: 'center',
+    marginTop: 40,
+    backgroundColor: '#fff',
+    elevation: 2,
   },
   emptyText: {
     textAlign: 'center',
-    fontSize: 16,
-    color: '#757575',
-    padding: 20,
+    fontSize: 20,
+    color: '#666',
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  emptySubtext: {
+    textAlign: 'center',
+    fontSize: 17,
+    color: '#999',
+    lineHeight: 24,
   },
 });

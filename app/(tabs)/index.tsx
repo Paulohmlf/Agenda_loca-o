@@ -1,23 +1,25 @@
-import { useFocusEffect, useRouter } from 'expo-router'; // Importa useRouter
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Clipboard,
   Linking,
+  RefreshControl,
   ScrollView,
   StyleSheet,
+  Vibration,
   View,
 } from 'react-native';
 import {
-  Button, // Importa Button
+  Button,
   Card,
   Chip,
   Divider,
-  IconButton,
+  FAB,
+  Surface,
   Text,
 } from 'react-native-paper';
-// Importa as queries novas
 import {
   atualizarLocacoesVencidasAutomaticamente,
   cancelarLocacao,
@@ -43,43 +45,58 @@ interface Locacao {
   placa: string;
 }
 
-// O nome da função agora é AgendaScreen, como no seu arquivo original
 export default function AgendaScreen() {
-  const router = useRouter(); // Adicionado da sua tela original
-  const [mesAtual, setMesAtual] = useState<number>(new Date().getMonth() + 1);
-  const [anoAtual, setAnoAtual] = useState<number>(new Date().getFullYear());
+  const router = useRouter();
+  const [mesAtual, setMesAtual] = useState(new Date().getMonth() + 1);
+  const [anoAtual, setAnoAtual] = useState(new Date().getFullYear());
   const [locacoes, setLocacoes] = useState<Locacao[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [exibirApenasComLocacao, setExibirApenasComLocacao] = useState(true);
 
   const mesesNomes = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
   ];
 
-  // Hook para carregar dados (com a limpeza automática)
+  // Carregamento de dados com feedback háptico
+  const carregarDados = useCallback(async () => {
+    try {
+      await atualizarLocacoesVencidasAutomaticamente();
+      const dados = await getLocacoesDoMes(anoAtual, mesAtual);
+      setLocacoes(dados as Locacao[]);
+    } catch (error) {
+      console.error('Erro ao carregar locações:', error);
+      Alert.alert('❌ Erro', 'Não foi possível carregar as locações. Tente novamente.');
+    }
+  }, [anoAtual, mesAtual]);
+
+  // Hook de foco
   useFocusEffect(
     useCallback(() => {
       const carregarDadosDaTela = async () => {
         setLoading(true);
-        try {
-          await atualizarLocacoesVencidasAutomaticamente();
-          const dados = await getLocacoesDoMes(anoAtual, mesAtual);
-          setLocacoes(dados as Locacao[]);
-        } catch (error) {
-          console.error("Erro ao carregar locações:", error);
-        } finally {
-          setLoading(false);
-        }
+        await carregarDados();
+        setLoading(false);
       };
       carregarDadosDaTela();
       return () => {
         setLocacoes([]);
       };
-    }, [mesAtual, anoAtual])
+    }, [carregarDados])
   );
 
-  // Funções de navegação
+  // Pull to refresh
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await carregarDados();
+    setRefreshing(false);
+    Vibration.vibrate(50);
+  }, [carregarDados]);
+
+  // Navegação de mês com feedback
   const avancarMes = () => {
+    Vibration.vibrate(30);
     if (mesAtual === 12) {
       setMesAtual(1);
       setAnoAtual(anoAtual + 1);
@@ -89,6 +106,7 @@ export default function AgendaScreen() {
   };
 
   const voltarMes = () => {
+    Vibration.vibrate(30);
     if (mesAtual === 1) {
       setMesAtual(12);
       setAnoAtual(anoAtual - 1);
@@ -97,340 +115,621 @@ export default function AgendaScreen() {
     }
   };
 
-  // Funções de formatação
-  const getCorStatus = (status: string): string => {
-    switch (status) {
-      case 'ativa':
-        return '#4CAF50';
-      case 'finalizada':
-        return '#2196F3';
-      case 'cancelada':
-        return '#F44336';
-      default:
-        return '#FF9800';
-    }
+  const irParaMesAtual = () => {
+    Vibration.vibrate(50);
+    setMesAtual(new Date().getMonth() + 1);
+    setAnoAtual(new Date().getFullYear());
   };
 
-  // --- Funções de Ação (copiadas do seu index.tsx original) ---
+  // Funções com mensagens mais claras
   const copiarNumero = (numero: string, cliente: string) => {
     if (numero && numero.trim()) {
-      Clipboard.setString(numero);
-      Alert.alert('📋 Copiado!', `Número de ${cliente} copiado: ${numero}`);
+      Clipboard.setString(numero); // ← MUDANÇA: API nativa
+      Vibration.vibrate(100);
+      Alert.alert(
+        '✅ Número Copiado',
+        `O número de ${cliente} foi copiado:\n\n${numero}\n\nCole no WhatsApp ou onde preferir.`,
+        [{ text: 'Ok, Entendi', style: 'default' }]
+      );
     } else {
-      Alert.alert('⚠️ Aviso', 'Este cliente não possui número cadastrado');
+      Alert.alert(
+        '⚠️ Número Não Disponível',
+        `${cliente} não tem número de telefone cadastrado.`,
+        [{ text: 'Entendi', style: 'default' }]
+      );
     }
   };
 
   const ligarParaCliente = (numero: string, cliente: string) => {
     if (numero && numero.trim()) {
-      const numeroLimpo = numero.replace(/\D/g, '');
-      const url = `tel:${numeroLimpo}`;
-      
-      Linking.canOpenURL(url)
-        .then((supported) => {
-          if (supported) {
-            Linking.openURL(url);
-          } else {
-            Alert.alert('❌ Erro', 'Não é possível realizar chamadas neste dispositivo');
-          }
-        })
-        .catch(() => {
-          Alert.alert('❌ Erro', 'Erro ao tentar realizar a chamada');
-        });
+      Alert.alert(
+        '📞 Ligar para Cliente',
+        `Deseja ligar para ${cliente}?\n\nNúmero: ${numero}`,
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Sim, Ligar Agora',
+            style: 'default',
+            onPress: async () => {
+              const numeroLimpo = numero.replace(/\D/g, '');
+              const url = `tel:${numeroLimpo}`;
+              try {
+                const canOpen = await Linking.canOpenURL(url);
+                if (canOpen) {
+                  Vibration.vibrate(50);
+                  await Linking.openURL(url);
+                } else {
+                  Alert.alert('❌ Erro', 'Não é possível fazer chamadas neste aparelho.');
+                }
+              } catch {
+                Alert.alert('❌ Erro', 'Ocorreu um problema ao tentar ligar.');
+              }
+            },
+          },
+        ]
+      );
     } else {
-      Alert.alert('⚠️ Aviso', 'Este cliente não possui número cadastrado');
+      Alert.alert(
+        '⚠️ Número Não Disponível',
+        `${cliente} não tem número de telefone cadastrado.`
+      );
     }
   };
 
   const handleEditarLocacao = (locacaoId: number) => {
+    Vibration.vibrate(30);
     router.push(`/editarLocacao?id=${locacaoId}`);
   };
 
   const handleCancelarLocacao = (locacaoId: number, carro: string, cliente: string) => {
+    Vibration.vibrate([0, 50, 100, 50]);
     Alert.alert(
-      '⚠️ Cancelar Locação',
-      `Tem certeza que deseja cancelar a locação do ${carro} para ${cliente}?`,
+      '⚠️ Cancelar Locação?',
+      `Você está prestes a cancelar:\n\n🚗 Veículo: ${carro}\n👤 Cliente: ${cliente}\n\nEsta ação não pode ser desfeita. Deseja continuar?`,
       [
-        { text: 'Não', style: 'cancel' },
+        { text: 'Não, Voltar', style: 'cancel' },
         {
-          text: 'Sim, Cancelar',
+          text: 'Sim, Cancelar Locação',
           style: 'destructive',
           onPress: async () => {
             try {
               await cancelarLocacao(locacaoId);
-              Alert.alert('✅ Sucesso', 'Locação cancelada com sucesso!');
-              // Recarrega os dados da tela
-              setLoading(true);
-              await atualizarLocacoesVencidasAutomaticamente();
-              const dados = await getLocacoesDoMes(anoAtual, mesAtual);
-              setLocacoes(dados as Locacao[]);
-              setLoading(false);
+              Vibration.vibrate(200);
+              Alert.alert(
+                '✅ Locação Cancelada',
+                'A locação foi cancelada com sucesso!',
+                [{ text: 'Ok', style: 'default' }]
+              );
+              await carregarDados();
             } catch (error: any) {
-              Alert.alert('❌ Erro', 'Erro ao cancelar locação: ' + error.message);
+              Alert.alert('❌ Erro', `Não foi possível cancelar:\n\n${error.message}`);
             }
           },
         },
       ]
     );
   };
-  // --- Fim das Funções de Ação ---
 
-
-  // --- LÓGICA DE RENDERIZAÇÃO ---
+  // Função de renderização otimizada
   const renderizarDiasDoMes = () => {
     if (loading) {
-      return <ActivityIndicator size="large" style={styles.loadingIndicator} />;
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6200ee" />
+          <Text style={styles.loadingText}>Carregando agenda...</Text>
+        </View>
+      );
     }
 
     const ultimoDia = new Date(anoAtual, mesAtual, 0).getDate();
     const diasDoMes = Array.from({ length: ultimoDia }, (_, i) => i + 1);
     const mesStr = String(mesAtual).padStart(2, '0');
+    const hoje = new Date().toISOString().split('T')[0];
 
-    return diasDoMes.map(dia => {
+    // Filtrar dias
+    const diasParaExibir = exibirApenasComLocacao
+      ? diasDoMes.filter(dia => {
+          const diaStr = String(dia).padStart(2, '0');
+          const diaAtualFormatado = `${anoAtual}-${mesStr}-${diaStr}`;
+          const locacoesDoDia = locacoes.filter(
+            loc =>
+              diaAtualFormatado >= loc.data_inicio &&
+              diaAtualFormatado <= loc.data_fim &&
+              loc.status !== 'cancelada'
+          );
+          return locacoesDoDia.length > 0;
+        })
+      : diasDoMes;
+
+    if (diasParaExibir.length === 0) {
+      return (
+        <Card style={styles.emptyCard}>
+          <Card.Content>
+            <Text style={styles.emptyTitle}>📅 Nenhuma Locação</Text>
+            <Text style={styles.emptySubtitle}>
+              Não há locações agendadas para {mesesNomes[mesAtual - 1]} de {anoAtual}.
+            </Text>
+            <Button
+              mode="contained"
+              icon="plus"
+              onPress={() => router.push('/locacao')}
+              style={styles.emptyButton}>
+              Cadastrar Nova Locação
+            </Button>
+          </Card.Content>
+        </Card>
+      );
+    }
+
+    return diasParaExibir.map(dia => {
       const diaStr = String(dia).padStart(2, '0');
       const diaAtualFormatado = `${anoAtual}-${mesStr}-${diaStr}`;
-
-      const locacoesDoDia = locacoes.filter(loc =>
-        diaAtualFormatado >= loc.data_inicio &&
-        diaAtualFormatado <= loc.data_fim &&
-        loc.status !== 'cancelada'
+      const ehHoje = diaAtualFormatado === hoje;
+      
+      const locacoesDoDia = locacoes.filter(
+        loc =>
+          diaAtualFormatado >= loc.data_inicio &&
+          diaAtualFormatado <= loc.data_fim &&
+          loc.status !== 'cancelada'
       );
 
-      const diaDaSemana = new Date(anoAtual, mesAtual - 1, dia).toLocaleDateString('pt-BR', { weekday: 'long' });
+      const diaDaSemana = new Date(anoAtual, mesAtual - 1, dia).toLocaleDateString('pt-BR', {
+        weekday: 'long',
+      });
 
       return (
-        <View key={dia} style={styles.diaContainer}>
-          <Text variant="headlineSmall" style={styles.diaTitulo}>
-            Dia {dia}
-            <Text variant="titleMedium" style={styles.diaSemana}>
-              {` (${diaDaSemana.charAt(0).toUpperCase() + diaDaSemana.slice(1)})`}
+        <Surface
+          key={`dia-${dia}`}
+          style={[styles.diaContainer, ehHoje && styles.diaHoje]}
+          elevation={ehHoje ? 4 : 2}>
+          {/* Cabeçalho do dia */}
+          <View style={styles.diaHeader}>
+            <Text style={styles.diaTitulo}>
+              {ehHoje && '📍 '}Dia {dia}
             </Text>
-          </Text>
+            <Text style={styles.diaSemana}>
+              {diaDaSemana.charAt(0).toUpperCase() + diaDaSemana.slice(1)}
+            </Text>
+            {ehHoje && (
+              <Chip mode="flat" style={styles.chipHoje} textStyle={styles.chipHojeText}>
+                HOJE
+              </Chip>
+            )}
+          </View>
+
           <Divider style={styles.divider} />
 
-          {locacoesDoDia.length === 0 ? (
-            <Text style={styles.semLocacao}>Sem locação</Text>
-          ) : (
-            locacoesDoDia.map(loc => {
-              let textoDoDia = 'Locação em andamento';
-              if (diaAtualFormatado === loc.data_inicio) {
-                textoDoDia = `▶️ Retirada: ${loc.hora_inicio}`;
-              } else if (diaAtualFormatado === loc.data_fim) {
-                textoDoDia = `🏁 Devolução: ${loc.hora_fim}`;
-              }
+          {/* Locações do dia */}
+          {locacoesDoDia.map((loc, index) => {
+            let textoDoDia = '🔄 Locação em andamento';
+            if (diaAtualFormatado === loc.data_inicio) {
+              textoDoDia = `▶️ Retirada às ${loc.hora_inicio}`;
+            } else if (diaAtualFormatado === loc.data_fim) {
+              textoDoDia = `🏁 Devolução às ${loc.hora_fim}`;
+            }
 
-              return (
-                <Card key={loc.id} style={styles.cardLocacao}>
-                  <Card.Content>
-                    <View style={styles.headerCard}>
-                      <Text style={styles.carro}>{loc.carro} - {loc.placa}</Text>
-                      <Chip
-                        style={[styles.chipPequeno, { backgroundColor: getCorStatus(loc.status) }]}
-                        textStyle={styles.chipPequenoTexto}
-                      >
-                        {loc.status.toUpperCase()}
-                      </Chip>
-                    </View>
-                    <Text style={styles.cliente}>Cliente: {loc.cliente}</Text>
-                    <Text style={styles.detalheDia}>{textoDoDia}</Text>
+            const corStatus = loc.status === 'ativa' ? '#4CAF50' : '#2196F3';
 
-                    {/* --- Botões de Ação (do index.tsx original) --- */}
-                    <View style={styles.numeroContainer}>
-                      <Text variant="bodyMedium" style={styles.numeroTexto}>
-                        📞 {loc.numero_cliente || 'Não informado'}
-                      </Text>
-                      {loc.numero_cliente && (
-                        <View style={styles.numeroActions}>
-                          <IconButton
-                            icon="phone"
-                            size={20}
-                            onPress={() => ligarParaCliente(loc.numero_cliente, loc.cliente)}
-                            style={styles.botaoAcao}
-                            iconColor="#4CAF50"
-                          />
-                          <IconButton
-                            icon="content-copy"
-                            size={20}
-                            onPress={() => copiarNumero(loc.numero_cliente, loc.cliente)}
-                            style={styles.botaoAcao}
-                          />
-                        </View>
-                      )}
+            return (
+              <Card key={`loc-${loc.id}-${index}`} style={styles.cardLocacao}>
+                <Card.Content>
+                  {/* Informações do veículo */}
+                  <View style={styles.headerCard}>
+                    <View style={styles.veiculoInfo}>
+                      <Text style={styles.carro}>🚗 {loc.carro}</Text>
+                      <Text style={styles.placa}>Placa: {loc.placa}</Text>
                     </View>
-                    
-                    <View style={styles.actionsContainer}>
+                    <Chip
+                      mode="flat"
+                      style={[styles.chipStatus, { backgroundColor: corStatus }]}
+                      textStyle={styles.chipStatusTexto}>
+                      {loc.status.toUpperCase()}
+                    </Chip>
+                  </View>
+
+                  <Divider style={styles.dividerCard} />
+
+                  {/* Informações do cliente */}
+                  <Text style={styles.clienteLabel}>👤 Cliente:</Text>
+                  <Text style={styles.clienteNome}>{loc.cliente}</Text>
+
+                  <Text style={styles.detalheDia}>{textoDoDia}</Text>
+
+                  {/* Telefone */}
+                  <View style={styles.telefoneContainer}>
+                    <Text style={styles.telefoneLabel}>📞 Telefone:</Text>
+                    <Text style={styles.telefoneNumero}>
+                      {loc.numero_cliente || 'Não informado'}
+                    </Text>
+                  </View>
+
+                  {/* Botões de ação grandes e claros */}
+                  {loc.numero_cliente && (
+                    <View style={styles.botoesContatoContainer}>
                       <Button
-                        mode="outlined"
-                        icon="pencil"
-                        onPress={() => handleEditarLocacao(loc.id)}
-                        style={styles.actionButton}
-                      >
-                        Editar
+                        mode="contained-tonal"
+                        icon="phone"
+                        onPress={() => ligarParaCliente(loc.numero_cliente, loc.cliente)}
+                        style={styles.botaoGrande}
+                        labelStyle={styles.botaoTexto}
+                        contentStyle={styles.botaoConteudo}>
+                        Ligar
                       </Button>
                       <Button
-                        mode="outlined"
-                        icon="delete"
-                        onPress={() => handleCancelarLocacao(loc.id, loc.carro, loc.cliente)}
-                        style={styles.actionButton}
-                        textColor="#d32f2f"
-                      >
-                        Cancelar
+                        mode="contained-tonal"
+                        icon="content-copy"
+                        onPress={() => copiarNumero(loc.numero_cliente, loc.cliente)}
+                        style={styles.botaoGrande}
+                        labelStyle={styles.botaoTexto}
+                        contentStyle={styles.botaoConteudo}>
+                        Copiar Número
                       </Button>
                     </View>
-                    {/* --- Fim dos Botões de Ação --- */}
+                  )}
 
-                  </Card.Content>
-                </Card>
-              );
-            })
-          )}
-        </View>
+                  <Divider style={styles.dividerAcoes} />
+
+                  {/* Ações principais */}
+                  <View style={styles.actionsContainer}>
+                    <Button
+                      mode="elevated"
+                      icon="pencil"
+                      onPress={() => handleEditarLocacao(loc.id)}
+                      style={styles.actionButton}
+                      labelStyle={styles.actionButtonText}
+                      contentStyle={styles.botaoConteudo}>
+                      Editar
+                    </Button>
+                    <Button
+                      mode="elevated"
+                      icon="close-circle"
+                      onPress={() => handleCancelarLocacao(loc.id, loc.carro, loc.cliente)}
+                      style={[styles.actionButton, styles.cancelButton]}
+                      labelStyle={styles.cancelButtonText}
+                      contentStyle={styles.botaoConteudo}>
+                      Cancelar
+                    </Button>
+                  </View>
+                </Card.Content>
+              </Card>
+            );
+          })}
+        </Surface>
       );
     });
   };
 
-  const nomeMesFormatado = mesesNomes[mesAtual - 1].charAt(0).toUpperCase() + mesesNomes[mesAtual - 1].slice(1);
+  const nomeMesFormatado = mesesNomes[mesAtual - 1];
+  const ehMesAtual = mesAtual === new Date().getMonth() + 1 && anoAtual === new Date().getFullYear();
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Cabeçalho de Navegação (antigo seletor de data) */}
-      <View style={styles.navegacao}>
-        <IconButton icon="chevron-left" size={30} onPress={voltarMes} />
-        <Text style={styles.tituloMes}>
-          {nomeMesFormatado} {anoAtual}
-        </Text>
-        <IconButton icon="chevron-right" size={30} onPress={avancarMes} />
-      </View>
+    <View style={styles.container}>
+      {/* Cabeçalho de navegação melhorado */}
+      <Surface style={styles.navegacao} elevation={4}>
+        <Button
+          mode="text"
+          icon="chevron-left"
+          onPress={voltarMes}
+          labelStyle={styles.navegacaoButtonText}
+          contentStyle={styles.navegacaoButtonContent}>
+          Anterior
+        </Button>
+
+        <View style={styles.mesContainer}>
+          <Text style={styles.tituloMes}>{nomeMesFormatado}</Text>
+          <Text style={styles.anoTexto}>{anoAtual}</Text>
+          {!ehMesAtual && (
+            <Button
+              mode="text"
+              compact
+              onPress={irParaMesAtual}
+              labelStyle={styles.voltarHojeText}>
+              Ir para Hoje
+            </Button>
+          )}
+        </View>
+
+        <Button
+          mode="text"
+          icon="chevron-right"
+          onPress={avancarMes}
+          labelStyle={styles.navegacaoButtonText}
+          contentStyle={styles.navegacaoButtonContent}>
+          Próximo
+        </Button>
+      </Surface>
+
+      {/* Filtro de visualização */}
+      <Surface style={styles.filtroContainer} elevation={1}>
+        <Button
+          mode={exibirApenasComLocacao ? 'contained' : 'outlined'}
+          onPress={() => {
+            Vibration.vibrate(30);
+            setExibirApenasComLocacao(!exibirApenasComLocacao);
+          }}
+          icon={exibirApenasComLocacao ? 'eye' : 'eye-off'}
+          labelStyle={styles.filtroText}
+          contentStyle={styles.filtroButtonContent}>
+          {exibirApenasComLocacao ? 'Mostrando Apenas Dias Com Locação' : 'Mostrando Todos os Dias'}
+        </Button>
+      </Surface>
 
       {/* Conteúdo */}
-      {renderizarDiasDoMes()}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#6200ee']}
+            title="Puxe para atualizar"
+          />
+        }>
+        {renderizarDiasDoMes()}
+      </ScrollView>
 
-    </ScrollView>
+      {/* FAB para nova locação */}
+      <FAB
+        icon="plus"
+        label="Nova Locação"
+        style={styles.fab}
+        onPress={() => {
+          Vibration.vibrate(50);
+          router.push('/locacao');
+        }}
+      />
+    </View>
   );
 }
 
-// Estilos (Combinação do index.tsx e agendaMensal.tsx)
+// Estilos otimizados para acessibilidade (mantidos igual ao anterior)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: '#f5f5f5',
   },
   navegacao: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 12,
     backgroundColor: 'white',
-    borderRadius: 8,
-    elevation: 4,
+    borderRadius: 12,
+    paddingVertical: 12,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+  },
+  navegacaoButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  navegacaoButtonContent: {
+    paddingHorizontal: 4,
+  },
+  mesContainer: {
+    alignItems: 'center',
+    flex: 1,
   },
   tituloMes: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#6200ee',
+  },
+  anoTexto: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 2,
+  },
+  voltarHojeText: {
+    fontSize: 13,
+    marginTop: 4,
+  },
+  filtroContainer: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 8,
+  },
+  filtroText: {
+    fontSize: 14,
+  },
+  filtroButtonContent: {
+    paddingVertical: 4,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 100,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 60,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 18,
+    color: '#666',
+  },
+  emptyCard: {
+    marginTop: 40,
+    padding: 20,
+    backgroundColor: 'white',
+  },
+  emptyTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    flex: 1,
     textAlign: 'center',
-    color: '#6200ee',
+    marginBottom: 12,
+    color: '#333',
   },
-  loadingIndicator: {
-    marginTop: 50,
+  emptySubtitle: {
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 24,
+    color: '#666',
+    lineHeight: 26,
+  },
+  emptyButton: {
+    marginTop: 8,
   },
   diaContainer: {
-    marginBottom: 20,
+    marginBottom: 24,
     backgroundColor: '#ffffff',
-    borderRadius: 8,
-    padding: 12,
-    elevation: 2,
+    borderRadius: 12,
+    padding: 16,
+  },
+  diaHoje: {
+    borderWidth: 3,
+    borderColor: '#6200ee',
+  },
+  diaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    flexWrap: 'wrap',
   },
   diaTitulo: {
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#6200ee',
+    marginRight: 12,
   },
   diaSemana: {
-    fontWeight: 'normal',
+    fontSize: 18,
     color: '#555',
+    flex: 1,
+  },
+  chipHoje: {
+    backgroundColor: '#6200ee',
+    height: 28,
+  },
+  chipHojeText: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: 'bold',
   },
   divider: {
-    marginVertical: 8,
-  },
-  semLocacao: {
-    fontSize: 14,
-    color: '#777',
-    paddingVertical: 10,
-    textAlign: 'center',
-    fontStyle: 'italic',
+    marginVertical: 12,
+    height: 2,
   },
   cardLocacao: {
-    marginBottom: 8,
-    backgroundColor: '#f9f9f9',
-    elevation: 1,
+    marginBottom: 16,
+    backgroundColor: '#fafafa',
+    elevation: 2,
   },
   headerCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  veiculoInfo: {
+    flex: 1,
+    marginRight: 12,
   },
   carro: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  placa: {
     fontSize: 16,
-    fontWeight: 'bold',
-    flex: 1,
-    marginRight: 8,
+    color: '#666',
   },
-  chipPequeno: {
-    height: 24,
-    paddingHorizontal: 8,
+  chipStatus: {
+    height: 32,
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  chipPequenoTexto: {
+  chipStatusTexto: {
     color: 'white',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 'bold',
-    lineHeight: 16,
   },
-  cliente: {
+  dividerCard: {
+    marginVertical: 12,
+  },
+  clienteLabel: {
+    fontSize: 15,
+    color: '#666',
+    marginBottom: 4,
+  },
+  clienteNome: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  detalheDia: {
+    fontSize: 17,
+    color: '#444',
+    fontWeight: '500',
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  telefoneContainer: {
+    backgroundColor: '#e8f5e9',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  telefoneLabel: {
     fontSize: 14,
     color: '#666',
     marginBottom: 4,
   },
-  detalheDia: {
-    fontSize: 14,
-    color: '#333',
-    fontWeight: '500',
-    marginTop: 4,
+  telefoneNumero: {
+    fontSize: 19,
+    fontWeight: '600',
+    color: '#2e7d32',
   },
-  // Estilos dos botões (do index.tsx original)
-  numeroContainer: {
+  botoesContatoContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    paddingTop: 8,
+    gap: 12,
+    marginBottom: 12,
   },
-  numeroTexto: {
+  botaoGrande: {
     flex: 1,
-    fontSize: 14,
   },
-  numeroActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  botaoTexto: {
+    fontSize: 16,
+    fontWeight: '600',
   },
-  botaoAcao: {
-    margin: 0,
-    marginLeft: 4,
-    height: 32,
-    width: 32,
+  botaoConteudo: {
+    paddingVertical: 8,
+  },
+  dividerAcoes: {
+    marginVertical: 12,
   },
   actionsContainer: {
     flexDirection: 'row',
-    marginTop: 12,
-    gap: 8,
+    gap: 12,
   },
   actionButton: {
     flex: 1,
+    backgroundColor: '#fff',
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6200ee',
+  },
+  cancelButton: {
+    backgroundColor: '#ffebee',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#d32f2f',
+  },
+  fab: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
+    backgroundColor: '#6200ee',
   },
 });
