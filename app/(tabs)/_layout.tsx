@@ -9,28 +9,20 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colorScheme === 'dark' ? '#BB86FC' : '#6200ee',
-        headerShown: true,
-        headerStyle: {
-          backgroundColor: colorScheme === 'dark' ? '#121212' : '#6200ee',
-        },
-        headerTintColor: '#fff',
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
-        tabBarStyle: {
-          backgroundColor: colorScheme === 'dark' ? '#1E1E1E' : '#fff',
-        },
+        tabBarActiveTintColor: '#6200ee',
+        headerShown: false,
       }}>
-      
       {/* ABA 1 - AGENDA */}
       <Tabs.Screen
         name="index"
         options={{
           title: 'Agenda',
-          headerTitle: 'Agenda de Hoje',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="event" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <MaterialIcons 
+              name="event" 
+              size={28} 
+              color={color} 
+            />
           ),
         }}
       />
@@ -40,9 +32,12 @@ export default function TabLayout() {
         name="financeiro"
         options={{
           title: 'Financeiro',
-          headerTitle: 'Controle Financeiro',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="attach-money" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <MaterialIcons 
+              name="attach-money" 
+              size={28} 
+              color={color} 
+            />
           ),
         }}
       />
@@ -52,9 +47,12 @@ export default function TabLayout() {
         name="novo"
         options={{
           title: 'Novo',
-          headerTitle: 'Cadastrar',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="add-circle" size={size + 8} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <MaterialIcons 
+              name={focused ? 'add-circle' : 'add-circle-outline'} 
+              size={28} 
+              color={color} 
+            />
           ),
         }}
       />
@@ -64,9 +62,12 @@ export default function TabLayout() {
         name="mais"
         options={{
           title: 'Mais',
-          headerTitle: 'Menu',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="more-horiz" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <MaterialIcons 
+              name="menu" 
+              size={28} 
+              color={color} 
+            />
           ),
         }}
       />
@@ -75,31 +76,49 @@ export default function TabLayout() {
       <Tabs.Screen
         name="locacao"
         options={{
-          href: null, // Esconde da barra
+          href: null,
+          title: 'Locações',
         }}
       />
-      <Tabs.Screen
-        name="cadastro"
-        options={{
-          href: null, // Esconde da barra
-        }}
-      />
+
       <Tabs.Screen
         name="frota"
         options={{
-          href: null, // Esconde da barra
+          href: null,
+          title: 'Frota',
         }}
       />
+
       <Tabs.Screen
         name="historico"
         options={{
-          href: null, // Esconde da barra
+          href: null,
+          title: 'Histórico',
         }}
       />
+
+      <Tabs.Screen
+        name="cadastro"
+        options={{
+          href: null,
+          title: 'Cadastro',
+        }}
+      />
+
       <Tabs.Screen
         name="configuracoes"
         options={{
-          href: null, // Esconde da barra
+          href: null,
+          title: 'Configurações',
+        }}
+      />
+
+      {/* NOVA TELA - AGENDA MENSAL */}
+      <Tabs.Screen
+        name="agendaMensal"
+        options={{
+          href: null,
+          title: 'Agenda Mensal',
         }}
       />
     </Tabs>

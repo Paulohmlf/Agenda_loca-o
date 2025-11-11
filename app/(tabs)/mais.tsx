@@ -36,6 +36,8 @@ export default function MaisScreen() {
             style={styles.listItem}
           />
 
+          {/* O item "Agenda Mensal" foi removido daqui */}
+
           <Divider style={styles.divider} />
 
           <Text variant="titleSmall" style={styles.secaoTitulo}>

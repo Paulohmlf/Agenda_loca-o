@@ -2,7 +2,12 @@ import { useFocusEffect } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, Chip, Divider, Menu, Text } from 'react-native-paper';
-import { atualizarStatusCarro, listarCarrosComStatus } from '../../src/database/queries';
+// Importa a nova função de atualização automática
+import {
+  atualizarLocacoesVencidasAutomaticamente,
+  atualizarStatusCarro,
+  listarCarrosComStatus,
+} from '../../src/database/queries';
 
 export default function FrotaScreen() {
   const [carros, setCarros] = useState<any[]>([]);
@@ -24,6 +29,11 @@ export default function FrotaScreen() {
 
   const carregarCarros = async () => {
     try {
+      // *** ATUALIZAÇÃO APLICADA AQUI ***
+      // Primeiro, atualiza locações vencidas e pagas para "finalizada"
+      await atualizarLocacoesVencidasAutomaticamente();
+      
+      // Depois, carrega a lista de carros com os status corretos
       const dados = await listarCarrosComStatus();
       setCarros(dados);
     } catch (error) {
@@ -33,7 +43,7 @@ export default function FrotaScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await carregarCarros();
+    await carregarCarros(); // Esta função agora também faz a atualização automática
     setRefreshing(false);
   };
 
@@ -110,7 +120,15 @@ export default function FrotaScreen() {
   };
 
   const calcularTotalPorStatus = (status: string) => {
-    return carros.filter(c => c.status === status).length;
+    // Usamos um Set para contar apenas IDs únicos de carros
+    const idsUnicos = new Set(carros.filter(c => c.status === status).map(c => c.id));
+    return idsUnicos.size;
+  };
+  
+  const calcularTotalFrota = () => {
+    // Usamos um Set para contar o total de IDs únicos de carros
+    const idsUnicos = new Set(carros.map(c => c.id));
+    return idsUnicos.size;
   };
 
   return (
@@ -150,7 +168,7 @@ export default function FrotaScreen() {
               onPress={() => setFiltroStatus('todos')}
               style={styles.chip}
             >
-              Todos ({carros.length})
+              Todos ({calcularTotalFrota()})
             </Chip>
             <Chip
               selected={filtroStatus === 'disponivel'}
@@ -194,7 +212,10 @@ export default function FrotaScreen() {
           </Card>
         ) : (
           carrosFiltrados.map((carro) => (
-            <Card key={carro.id} style={styles.carroCard}>
+            <Card 
+              key={`${carro.id}-${carro.locacao_id || 'disponivel'}`} 
+              style={styles.carroCard}
+            >
               <Card.Content>
                 <View style={styles.carroHeader}>
                   <View style={styles.carroInfo}>

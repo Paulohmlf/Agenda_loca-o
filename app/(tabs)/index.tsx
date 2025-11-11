@@ -1,44 +1,117 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { Alert, Clipboard, Linking, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Card, Chip, IconButton, Text } from 'react-native-paper';
-import { cancelarLocacao, getAgendaDoDia } from '../../src/database/queries';
+import { useFocusEffect, useRouter } from 'expo-router'; // Importa useRouter
+import React, { useCallback, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Clipboard,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
+import {
+  Button, // Importa Button
+  Card,
+  Chip,
+  Divider,
+  IconButton,
+  Text,
+} from 'react-native-paper';
+// Importa as queries novas
+import {
+  atualizarLocacoesVencidasAutomaticamente,
+  cancelarLocacao,
+  getLocacoesDoMes,
+} from '../../src/database/queries';
 
+// Interface para tipar as locações
+interface Locacao {
+  id: number;
+  cliente: string;
+  numero_cliente: string;
+  data_inicio: string;
+  hora_inicio: string;
+  data_fim: string;
+  hora_fim: string;
+  status: 'ativa' | 'finalizada' | 'cancelada';
+  valor_total: number;
+  valor_recebido?: number;
+  quantidade_dias: number;
+  status_pagamento: 'pago' | 'pendente';
+  forma_pagamento?: string;
+  carro: string;
+  placa: string;
+}
+
+// O nome da função agora é AgendaScreen, como no seu arquivo original
 export default function AgendaScreen() {
-  const router = useRouter();
-  const [date, setDate] = useState(new Date());
-  const [agenda, setAgenda] = useState([]);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const router = useRouter(); // Adicionado da sua tela original
+  const [mesAtual, setMesAtual] = useState<number>(new Date().getMonth() + 1);
+  const [anoAtual, setAnoAtual] = useState<number>(new Date().getFullYear());
+  const [locacoes, setLocacoes] = useState<Locacao[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    carregarAgenda();
-  }, [date]);
+  const mesesNomes = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+  ];
 
-  const carregarAgenda = async () => {
-    try {
-      const dataFormatada = date.toISOString().split('T')[0];
-      const dados = await getAgendaDoDia(dataFormatada);
-      setAgenda(dados);
-    } catch (error) {
-      console.error('Erro ao carregar agenda:', error);
+  // Hook para carregar dados (com a limpeza automática)
+  useFocusEffect(
+    useCallback(() => {
+      const carregarDadosDaTela = async () => {
+        setLoading(true);
+        try {
+          await atualizarLocacoesVencidasAutomaticamente();
+          const dados = await getLocacoesDoMes(anoAtual, mesAtual);
+          setLocacoes(dados as Locacao[]);
+        } catch (error) {
+          console.error("Erro ao carregar locações:", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      carregarDadosDaTela();
+      return () => {
+        setLocacoes([]);
+      };
+    }, [mesAtual, anoAtual])
+  );
+
+  // Funções de navegação
+  const avancarMes = () => {
+    if (mesAtual === 12) {
+      setMesAtual(1);
+      setAnoAtual(anoAtual + 1);
+    } else {
+      setMesAtual(mesAtual + 1);
     }
   };
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await carregarAgenda();
-    setRefreshing(false);
-  };
-
-  const onDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      setDate(selectedDate);
+  const voltarMes = () => {
+    if (mesAtual === 1) {
+      setMesAtual(12);
+      setAnoAtual(anoAtual - 1);
+    } else {
+      setMesAtual(mesAtual - 1);
     }
   };
 
+  // Funções de formatação
+  const getCorStatus = (status: string): string => {
+    switch (status) {
+      case 'ativa':
+        return '#4CAF50';
+      case 'finalizada':
+        return '#2196F3';
+      case 'cancelada':
+        return '#F44336';
+      default:
+        return '#FF9800';
+    }
+  };
+
+  // --- Funções de Ação (copiadas do seu index.tsx original) ---
   const copiarNumero = (numero: string, cliente: string) => {
     if (numero && numero.trim()) {
       Clipboard.setString(numero);
@@ -50,7 +123,7 @@ export default function AgendaScreen() {
 
   const ligarParaCliente = (numero: string, cliente: string) => {
     if (numero && numero.trim()) {
-      const numeroLimpo = numero.replace(/\D/g, ''); // Remove caracteres não numéricos
+      const numeroLimpo = numero.replace(/\D/g, '');
       const url = `tel:${numeroLimpo}`;
       
       Linking.canOpenURL(url)
@@ -61,8 +134,7 @@ export default function AgendaScreen() {
             Alert.alert('❌ Erro', 'Não é possível realizar chamadas neste dispositivo');
           }
         })
-        .catch((err) => {
-          console.error('Erro ao tentar ligar:', err);
+        .catch(() => {
           Alert.alert('❌ Erro', 'Erro ao tentar realizar a chamada');
         });
     } else {
@@ -87,7 +159,12 @@ export default function AgendaScreen() {
             try {
               await cancelarLocacao(locacaoId);
               Alert.alert('✅ Sucesso', 'Locação cancelada com sucesso!');
-              await carregarAgenda();
+              // Recarrega os dados da tela
+              setLoading(true);
+              await atualizarLocacoesVencidasAutomaticamente();
+              const dados = await getLocacoesDoMes(anoAtual, mesAtual);
+              setLocacoes(dados as Locacao[]);
+              setLoading(false);
             } catch (error: any) {
               Alert.alert('❌ Erro', 'Erro ao cancelar locação: ' + error.message);
             }
@@ -96,191 +173,247 @@ export default function AgendaScreen() {
       ]
     );
   };
+  // --- Fim das Funções de Ação ---
 
-  const getCorPorTipo = (tipo: string) => {
-    switch (tipo) {
-      case 'Retirada':
-        return '#4CAF50';
-      case 'Devolução':
-        return '#2196F3';
-      default:
-        return '#FF9800';
+
+  // --- LÓGICA DE RENDERIZAÇÃO ---
+  const renderizarDiasDoMes = () => {
+    if (loading) {
+      return <ActivityIndicator size="large" style={styles.loadingIndicator} />;
     }
+
+    const ultimoDia = new Date(anoAtual, mesAtual, 0).getDate();
+    const diasDoMes = Array.from({ length: ultimoDia }, (_, i) => i + 1);
+    const mesStr = String(mesAtual).padStart(2, '0');
+
+    return diasDoMes.map(dia => {
+      const diaStr = String(dia).padStart(2, '0');
+      const diaAtualFormatado = `${anoAtual}-${mesStr}-${diaStr}`;
+
+      const locacoesDoDia = locacoes.filter(loc =>
+        diaAtualFormatado >= loc.data_inicio &&
+        diaAtualFormatado <= loc.data_fim &&
+        loc.status !== 'cancelada'
+      );
+
+      const diaDaSemana = new Date(anoAtual, mesAtual - 1, dia).toLocaleDateString('pt-BR', { weekday: 'long' });
+
+      return (
+        <View key={dia} style={styles.diaContainer}>
+          <Text variant="headlineSmall" style={styles.diaTitulo}>
+            Dia {dia}
+            <Text variant="titleMedium" style={styles.diaSemana}>
+              {` (${diaDaSemana.charAt(0).toUpperCase() + diaDaSemana.slice(1)})`}
+            </Text>
+          </Text>
+          <Divider style={styles.divider} />
+
+          {locacoesDoDia.length === 0 ? (
+            <Text style={styles.semLocacao}>Sem locação</Text>
+          ) : (
+            locacoesDoDia.map(loc => {
+              let textoDoDia = 'Locação em andamento';
+              if (diaAtualFormatado === loc.data_inicio) {
+                textoDoDia = `▶️ Retirada: ${loc.hora_inicio}`;
+              } else if (diaAtualFormatado === loc.data_fim) {
+                textoDoDia = `🏁 Devolução: ${loc.hora_fim}`;
+              }
+
+              return (
+                <Card key={loc.id} style={styles.cardLocacao}>
+                  <Card.Content>
+                    <View style={styles.headerCard}>
+                      <Text style={styles.carro}>{loc.carro} - {loc.placa}</Text>
+                      <Chip
+                        style={[styles.chipPequeno, { backgroundColor: getCorStatus(loc.status) }]}
+                        textStyle={styles.chipPequenoTexto}
+                      >
+                        {loc.status.toUpperCase()}
+                      </Chip>
+                    </View>
+                    <Text style={styles.cliente}>Cliente: {loc.cliente}</Text>
+                    <Text style={styles.detalheDia}>{textoDoDia}</Text>
+
+                    {/* --- Botões de Ação (do index.tsx original) --- */}
+                    <View style={styles.numeroContainer}>
+                      <Text variant="bodyMedium" style={styles.numeroTexto}>
+                        📞 {loc.numero_cliente || 'Não informado'}
+                      </Text>
+                      {loc.numero_cliente && (
+                        <View style={styles.numeroActions}>
+                          <IconButton
+                            icon="phone"
+                            size={20}
+                            onPress={() => ligarParaCliente(loc.numero_cliente, loc.cliente)}
+                            style={styles.botaoAcao}
+                            iconColor="#4CAF50"
+                          />
+                          <IconButton
+                            icon="content-copy"
+                            size={20}
+                            onPress={() => copiarNumero(loc.numero_cliente, loc.cliente)}
+                            style={styles.botaoAcao}
+                          />
+                        </View>
+                      )}
+                    </View>
+                    
+                    <View style={styles.actionsContainer}>
+                      <Button
+                        mode="outlined"
+                        icon="pencil"
+                        onPress={() => handleEditarLocacao(loc.id)}
+                        style={styles.actionButton}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        mode="outlined"
+                        icon="delete"
+                        onPress={() => handleCancelarLocacao(loc.id, loc.carro, loc.cliente)}
+                        style={styles.actionButton}
+                        textColor="#d32f2f"
+                      >
+                        Cancelar
+                      </Button>
+                    </View>
+                    {/* --- Fim dos Botões de Ação --- */}
+
+                  </Card.Content>
+                </Card>
+              );
+            })
+          )}
+        </View>
+      );
+    });
   };
 
+  const nomeMesFormatado = mesesNomes[mesAtual - 1].charAt(0).toUpperCase() + mesesNomes[mesAtual - 1].slice(1);
+
   return (
-    <View style={styles.container}>
-      <Card style={styles.headerCard}>
-        <Card.Content>
-          <Text variant="headlineMedium" style={styles.titulo}>
-            📅 Agenda de Hoje
-          </Text>
-          <Button 
-            mode="outlined" 
-            onPress={() => setShowDatePicker(true)}
-            style={styles.botaoData}
-            icon="calendar"
-          >
-            {date.toLocaleDateString('pt-BR', { 
-              day: '2-digit', 
-              month: 'long', 
-              year: 'numeric' 
-            })}
-          </Button>
-        </Card.Content>
-      </Card>
+    <ScrollView style={styles.container}>
+      {/* Cabeçalho de Navegação (antigo seletor de data) */}
+      <View style={styles.navegacao}>
+        <IconButton icon="chevron-left" size={30} onPress={voltarMes} />
+        <Text style={styles.tituloMes}>
+          {nomeMesFormatado} {anoAtual}
+        </Text>
+        <IconButton icon="chevron-right" size={30} onPress={avancarMes} />
+      </View>
 
-      {showDatePicker && (
-        <DateTimePicker
-          value={date}
-          mode="date"
-          display="default"
-          onChange={onDateChange}
-        />
-      )}
+      {/* Conteúdo */}
+      {renderizarDiasDoMes()}
 
-      <ScrollView 
-        style={styles.scrollView}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        {agenda.length === 0 ? (
-          <Card style={styles.emptyCard}>
-            <Card.Content>
-              <Text style={styles.emptyText}>
-                ✅ Nenhuma locação agendada para este dia
-              </Text>
-            </Card.Content>
-          </Card>
-        ) : (
-          agenda.map((item: any) => (
-            <Card key={item.id} style={styles.agendaCard}>
-              <Card.Content>
-                <View style={styles.cardHeader}>
-                  <Chip 
-                    style={[styles.chip, { backgroundColor: getCorPorTipo(item.tipo_agendamento) }]}
-                    textStyle={styles.chipText}
-                  >
-                    {item.tipo_agendamento}
-                  </Chip>
-                </View>
-                <Text variant="titleLarge" style={styles.carroNome}>
-                  🚗 {item.carro}
-                </Text>
-                <Text variant="bodyMedium">📋 Placa: {item.placa}</Text>
-                <Text variant="bodyMedium">👤 Cliente: {item.cliente}</Text>
-                
-                {/* Campo de número com botões de copiar e ligar */}
-                <View style={styles.numeroContainer}>
-                  <Text variant="bodyMedium" style={styles.numeroTexto}>
-                    📞 Número: {item.numero_cliente || 'Não informado'}
-                  </Text>
-                  {item.numero_cliente && (
-                    <View style={styles.numeroActions}>
-                      <IconButton
-                        icon="phone"
-                        size={20}
-                        onPress={() => ligarParaCliente(item.numero_cliente, item.cliente)}
-                        style={styles.botaoAcao}
-                        iconColor="#4CAF50"
-                      />
-                      <IconButton
-                        icon="content-copy"
-                        size={20}
-                        onPress={() => copiarNumero(item.numero_cliente, item.cliente)}
-                        style={styles.botaoAcao}
-                      />
-                    </View>
-                  )}
-                </View>
-
-                <View style={styles.horarioContainer}>
-                  <Text variant="bodySmall">
-                    ⏰ Início: {new Date(item.data_inicio).toLocaleDateString('pt-BR')} às {item.hora_inicio}
-                  </Text>
-                  <Text variant="bodySmall">
-                    🏁 Fim: {new Date(item.data_fim).toLocaleDateString('pt-BR')} às {item.hora_fim}
-                  </Text>
-                </View>
-
-                <View style={styles.actionsContainer}>
-                  <Button
-                    mode="outlined"
-                    icon="pencil"
-                    onPress={() => handleEditarLocacao(item.id)}
-                    style={styles.actionButton}
-                  >
-                    Editar
-                  </Button>
-                  <Button
-                    mode="outlined"
-                    icon="delete"
-                    onPress={() => handleCancelarLocacao(item.id, item.carro, item.cliente)}
-                    style={styles.actionButton}
-                    textColor="#d32f2f"
-                  >
-                    Cancelar
-                  </Button>
-                </View>
-              </Card.Content>
-            </Card>
-          ))
-        )}
-      </ScrollView>
-    </View>
+    </ScrollView>
   );
 }
 
+// Estilos (Combinação do index.tsx e agendaMensal.tsx)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    padding: 16,
     backgroundColor: '#f5f5f5',
   },
-  headerCard: {
-    margin: 16,
-    marginBottom: 8,
-    elevation: 4,
-  },
-  titulo: {
-    fontWeight: 'bold',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  botaoData: {
-    marginTop: 8,
-  },
-  scrollView: {
-    flex: 1,
-    padding: 16,
-  },
-  agendaCard: {
-    marginBottom: 12,
-    elevation: 4,
-  },
-  cardHeader: {
+  navegacao: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginBottom: 8,
-  },
-  chip: {
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    elevation: 4,
     paddingHorizontal: 8,
+    paddingVertical: 4,
   },
-  chipText: {
-    color: 'white',
+  tituloMes: {
+    fontSize: 24,
     fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'center',
+    color: '#6200ee',
   },
-  carroNome: {
+  loadingIndicator: {
+    marginTop: 50,
+  },
+  diaContainer: {
+    marginBottom: 20,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 12,
+    elevation: 2,
+  },
+  diaTitulo: {
     fontWeight: 'bold',
+    color: '#6200ee',
+  },
+  diaSemana: {
+    fontWeight: 'normal',
+    color: '#555',
+  },
+  divider: {
+    marginVertical: 8,
+  },
+  semLocacao: {
+    fontSize: 14,
+    color: '#777',
+    paddingVertical: 10,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  cardLocacao: {
+    marginBottom: 8,
+    backgroundColor: '#f9f9f9',
+    elevation: 1,
+  },
+  headerCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
+  carro: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    flex: 1,
+    marginRight: 8,
+  },
+  chipPequeno: {
+    height: 24,
+    paddingHorizontal: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chipPequenoTexto: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+    lineHeight: 16,
+  },
+  cliente: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  detalheDia: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  // Estilos dos botões (do index.tsx original)
   numeroContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 8,
   },
   numeroTexto: {
     flex: 1,
+    fontSize: 14,
   },
   numeroActions: {
     flexDirection: 'row',
@@ -289,12 +422,8 @@ const styles = StyleSheet.create({
   botaoAcao: {
     margin: 0,
     marginLeft: 4,
-  },
-  horarioContainer: {
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    height: 32,
+    width: 32,
   },
   actionsContainer: {
     flexDirection: 'row',
@@ -303,15 +432,5 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-  },
-  emptyCard: {
-    marginTop: 50,
-    alignItems: 'center',
-  },
-  emptyText: {
-    textAlign: 'center',
-    fontSize: 16,
-    color: '#757575',
-    padding: 20,
   },
 });

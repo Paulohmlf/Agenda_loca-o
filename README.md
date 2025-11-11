@@ -1,50 +1,119 @@
-# Welcome to your Expo app 👋
+# 🚗 Agenda de Locação
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Sistema mobile completo para **gestão de locações de veículos**, desenvolvido em **React Native com Expo**.  
+<br>Permite gerenciar frota, acompanhar locações, controlar pagamentos e visualizar relatórios financeiros — tudo de forma simples e intuitiva.
 
-## Get started
+---
 
-1. Install dependencies
+## 🧰 Tecnologias utilizadas
+
+- **React Native (Expo)**
+- **SQLite**
+- **React Navigation**
+- **Date-fns**
+- **Styled Components**
+
+---
+
+## ⚙️ Funcionalidades
+
+✅ Cadastro de clientes e veículos  
+✅ Controle de locações (data, valor, status)  
+✅ Geração automática de comprovantes em PDF  
+✅ Histórico de locações  
+✅ Busca e filtragem de registros  
+✅ Layout responsivo e moderno  
+
+---
+
+## 📸 Demonstração
+
+<p align="center">
+  <img src="assets/screenshot1.png" alt="Tela principal do app" width="300"/>
+</p>
+
+---
+
+## 🚀 Instalação e execução
+
+1. **Clone o repositório**
+   ```bash
+   git clone https://github.com/Paulohmlf/agenda-locacao.git
+   cd agenda-locacao
+````
+
+2. **Instale as dependências**
 
    ```bash
    npm install
    ```
 
-2. Start the app
+3. **Execute o projeto**
 
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+---
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## 📂 Estrutura de pastas
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+agenda-locacao/
+│
+├── src/
+│   ├── components/       # Componentes reutilizáveis
+│   ├── screens/          # Telas do aplicativo
+│   ├── database/         # Conexão e funções do SQLite
+│   ├── utils/            # Funções auxiliares
+│   └── assets/           # Ícones e imagens
+│
+├── App.js                # Arquivo principal
+└── package.json
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+---
 
-## Learn more
+## 🧪 Banco de dados
 
-To learn more about developing your project with Expo, look at the following resources:
+O projeto utiliza **SQLite local** para armazenar informações de clientes, veículos e locações.
+Todos os dados ficam salvos no dispositivo, garantindo rapidez e segurança.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+---
 
-## Join the community
+## 🧾 Geração de PDF
 
-Join our community of developers creating universal apps.
+Ao finalizar uma locação, o app gera automaticamente um **termo de responsabilidade em PDF**, contendo:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+* Dados do cliente (nome, CPF, RG, endereço, telefone)
+* Informações do veículo
+* Data e assinatura
+* Rodapé personalizado da empresa
+
+---
+
+## 🧑‍💻 Contribuindo
+
+1. Faça um **fork** do projeto
+2. Crie uma nova branch para sua feature (`git checkout -b minha-feature`)
+3. Faça o commit (`git commit -m 'Adiciona nova feature'`)
+4. Envie o push (`git push origin minha-feature`)
+5. Abra um **Pull Request**
+
+---
+
+## 🧩 Suporte
+
+Encontrou um bug ou quer sugerir uma melhoria?
+Abra uma [issue](https://github.com/Paulohmlf/agenda-locacao/issues).
+
+---
+
+## 👤 Autor
+
+**Paulo Henrique**
+📍 Prado, Pernambuco, Brasil
+🔗 [GitHub - @Paulohmlf](https://github.com/Paulohmlf)
+
+⭐ Se este projeto te ajudou, não esqueça de deixar uma **estrela** no repositório!
+
