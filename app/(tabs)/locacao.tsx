@@ -21,6 +21,7 @@ import {
 } from 'react-native-paper';
 import { useCarrosContext } from '../../src/context/CarrosContext';
 import { inserirLocacao, listarCarros } from '../../src/database/queries';
+import { scheduleNotification } from '../../src/utils/notifications'; // <--- Importação Adicionada
 
 export default function NovaLocacaoScreen() {
   const { refreshCarros, setRefreshCarros } = useCarrosContext();
@@ -152,6 +153,20 @@ export default function NovaLocacaoScreen() {
                 dataFimStr,
                 horaFimStr
               );
+
+              // --- LÓGICA DE NOTIFICAÇÃO ADICIONADA ---
+              const dataLembrete = new Date(dataFim);
+              dataLembrete.setHours(9, 0, 0, 0); // Define notificação para 09:00 do dia da devolução
+
+              if (dataLembrete > new Date()) {
+                await scheduleNotification(
+                  '📅 Devolução Hoje',
+                  `O cliente ${cliente} deve devolver o veículo ${carroSelecionado.modelo}.`,
+                  dataLembrete
+                );
+              }
+              // ----------------------------------------
+
               Vibration.vibrate(200);
               Alert.alert(
                 '✅ Sucesso!',
@@ -588,11 +603,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 16,
     marginBottom: 16,
-    flexWrap: 'wrap',
+    flexWrap: 'wrap', // CORREÇÃO DE LAYOUT PARA FONTES GRANDES
   },
   dateTimeItem: {
     flex: 1,
-    minWidth: 140,
+    minWidth: 140, // CORREÇÃO DE LAYOUT PARA FONTES GRANDES
   },
   dateTimeLabel: {
     fontSize: 16,

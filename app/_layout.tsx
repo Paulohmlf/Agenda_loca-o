@@ -7,6 +7,7 @@ import { useColorScheme } from 'react-native';
 import { PaperProvider } from 'react-native-paper';
 import { CarrosProvider } from '../src/context/CarrosContext';
 import { initDatabase } from '../src/database/database';
+import { requestNotificationPermissions } from '../src/utils/notifications'; // <--- Importado
 
 SplashScreen.preventAutoHideAsync();
 
@@ -15,17 +16,23 @@ export default function RootLayout() {
   const [dbReady, setDbReady] = useState(false);
 
   useEffect(() => {
-    const setupDatabase = async () => {
+    const setupApp = async () => {
       try {
+        // 1. Inicializa o Banco de Dados
         await initDatabase();
+        
+        // 2. Solicita permissão para notificações (importante fazer no início)
+        await requestNotificationPermissions();
+
+        // 3. Libera o App
         setDbReady(true);
         await SplashScreen.hideAsync();
       } catch (error) {
-        console.error('❌ Erro ao inicializar banco de dados:', error);
+        console.error('❌ Erro ao inicializar o aplicativo:', error);
       }
     };
 
-    setupDatabase();
+    setupApp();
   }, []);
 
   if (!dbReady) {
