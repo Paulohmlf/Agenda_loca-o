@@ -588,9 +588,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 16,
     marginBottom: 16,
+    flexWrap: 'wrap',
   },
   dateTimeItem: {
     flex: 1,
+    minWidth: 140,
   },
   dateTimeLabel: {
     fontSize: 16,

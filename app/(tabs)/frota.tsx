@@ -396,6 +396,8 @@ const styles = StyleSheet.create({
   resumoRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
+    flexWrap: 'wrap',
+    gap: 10,
   },
   resumoItem: {
     alignItems: 'center',

@@ -2,6 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import React, { useState } from 'react';
 import {
   Alert,
+  Dimensions,
   Linking,
   RefreshControl,
   ScrollView,
@@ -42,6 +43,9 @@ export default function FinanceiroScreen() {
   const [locacaoSelecionada, setLocacaoSelecionada] = useState<any>(null);
   const [formaPagamento, setFormaPagamento] = useState('pix');
   const [valorRecebido, setValorRecebido] = useState('');
+
+  // Altura da tela para limitar o Dialog em telas pequenas ou fontes grandes
+  const screenHeight = Dimensions.get('window').height;
 
   useFocusEffect(
     React.useCallback(() => {
@@ -355,55 +359,58 @@ Obrigado! 🙏`;
           <Dialog.Title style={styles.dialogTitulo}>💰 Confirmar Pagamento</Dialog.Title>
           <Divider />
           <Dialog.Content>
-            {locacaoSelecionada && (
-              <>
-                <Surface style={styles.dialogInfoCard} elevation={1}>
-                  <Text style={styles.dialogLabel}>👤 Cliente:</Text>
-                  <Text style={styles.dialogInfo}>{locacaoSelecionada.cliente}</Text>
+            {/* SCROLL ADICIONADO AQUI PARA EVITAR BUG DE FONTE GRANDE */}
+            <ScrollView style={{ maxHeight: screenHeight * 0.5 }}>
+              {locacaoSelecionada && (
+                <>
+                  <Surface style={styles.dialogInfoCard} elevation={1}>
+                    <Text style={styles.dialogLabel}>👤 Cliente:</Text>
+                    <Text style={styles.dialogInfo}>{locacaoSelecionada.cliente}</Text>
 
-                  <Text style={styles.dialogLabel}>🚗 Veículo:</Text>
-                  <Text style={styles.dialogInfo}>{locacaoSelecionada.carro}</Text>
+                    <Text style={styles.dialogLabel}>🚗 Veículo:</Text>
+                    <Text style={styles.dialogInfo}>{locacaoSelecionada.carro}</Text>
 
-                  <Text style={styles.dialogLabel}>💵 Valor da Locação:</Text>
-                  <Text style={styles.dialogValorOriginal}>
-                    R$ {locacaoSelecionada.valor_total.toFixed(2)}
-                  </Text>
-                </Surface>
+                    <Text style={styles.dialogLabel}>💵 Valor da Locação:</Text>
+                    <Text style={styles.dialogValorOriginal}>
+                      R$ {locacaoSelecionada.valor_total.toFixed(2)}
+                    </Text>
+                  </Surface>
 
-                <Divider style={styles.dividerDialog} />
+                  <Divider style={styles.dividerDialog} />
 
-                <TextInput
-                  label="Valor Recebido (R$)"
-                  value={valorRecebido}
-                  onChangeText={setValorRecebido}
-                  keyboardType="decimal-pad"
-                  mode="outlined"
-                  style={styles.inputValor}
-                  placeholder="Ex: 150.00"
-                  left={<TextInput.Icon icon="currency-brl" />}
-                />
+                  <TextInput
+                    label="Valor Recebido (R$)"
+                    value={valorRecebido}
+                    onChangeText={setValorRecebido}
+                    keyboardType="decimal-pad"
+                    mode="outlined"
+                    style={styles.inputValor}
+                    placeholder="Ex: 150.00"
+                    left={<TextInput.Icon icon="currency-brl" />}
+                  />
 
-                <Text style={styles.formaPagamentoTitulo}>💳 Forma de Pagamento:</Text>
-                <RadioButton.Group onValueChange={setFormaPagamento} value={formaPagamento}>
-                  <View style={styles.radioContainer}>
-                    <RadioButton.Item
-                      label="PIX"
-                      value="pix"
-                      mode="android"
-                      style={styles.radioItem}
-                      labelStyle={styles.radioLabel}
-                    />
-                    <RadioButton.Item
-                      label="Dinheiro"
-                      value="dinheiro"
-                      mode="android"
-                      style={styles.radioItem}
-                      labelStyle={styles.radioLabel}
-                    />
-                  </View>
-                </RadioButton.Group>
-              </>
-            )}
+                  <Text style={styles.formaPagamentoTitulo}>💳 Forma de Pagamento:</Text>
+                  <RadioButton.Group onValueChange={setFormaPagamento} value={formaPagamento}>
+                    <View style={styles.radioContainer}>
+                      <RadioButton.Item
+                        label="PIX"
+                        value="pix"
+                        mode="android"
+                        style={styles.radioItem}
+                        labelStyle={styles.radioLabel}
+                      />
+                      <RadioButton.Item
+                        label="Dinheiro"
+                        value="dinheiro"
+                        mode="android"
+                        style={styles.radioItem}
+                        labelStyle={styles.radioLabel}
+                      />
+                    </View>
+                  </RadioButton.Group>
+                </>
+              )}
+            </ScrollView>
           </Dialog.Content>
           <Dialog.Actions style={styles.dialogActions}>
             <Button
@@ -420,7 +427,7 @@ Obrigado! 🙏`;
               onPress={confirmarPagamento}
               labelStyle={styles.botaoConfirmarTexto}
               contentStyle={styles.botaoDialogConteudo}>
-              Confirmar Pagamento
+              Confirmar
             </Button>
           </Dialog.Actions>
         </Dialog>
@@ -481,16 +488,19 @@ const styles = StyleSheet.create({
   rowCards: {
     flexDirection: 'row',
     gap: 16,
+    flexWrap: 'wrap', // Permite quebra de linha em fontes grandes
   },
   cardPequeno: {
     flex: 1,
     backgroundColor: '#e8f5e9',
     elevation: 2,
+    minWidth: 150, // Tamanho mínimo para não espremer
   },
   cardPendente: {
     flex: 1,
     backgroundColor: '#fff3e0',
     elevation: 2,
+    minWidth: 150, // Tamanho mínimo para não espremer
   },
   valorMedio: {
     fontSize: 24,
@@ -680,7 +690,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   dialog: {
-    maxHeight: '90%',
+    // maxHeight removido daqui pois agora é controlado no ScrollView
   },
   dialogTitulo: {
     fontSize: 22,

@@ -124,7 +124,7 @@ export default function AgendaScreen() {
   // Funções com mensagens mais claras
   const copiarNumero = (numero: string, cliente: string) => {
     if (numero && numero.trim()) {
-      Clipboard.setString(numero); // ← MUDANÇA: API nativa
+      Clipboard.setString(numero);
       Vibration.vibrate(100);
       Alert.alert(
         '✅ Número Copiado',
@@ -404,57 +404,6 @@ export default function AgendaScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Cabeçalho de navegação melhorado */}
-      <Surface style={styles.navegacao} elevation={4}>
-        <Button
-          mode="text"
-          icon="chevron-left"
-          onPress={voltarMes}
-          labelStyle={styles.navegacaoButtonText}
-          contentStyle={styles.navegacaoButtonContent}>
-          Anterior
-        </Button>
-
-        <View style={styles.mesContainer}>
-          <Text style={styles.tituloMes}>{nomeMesFormatado}</Text>
-          <Text style={styles.anoTexto}>{anoAtual}</Text>
-          {!ehMesAtual && (
-            <Button
-              mode="text"
-              compact
-              onPress={irParaMesAtual}
-              labelStyle={styles.voltarHojeText}>
-              Ir para Hoje
-            </Button>
-          )}
-        </View>
-
-        <Button
-          mode="text"
-          icon="chevron-right"
-          onPress={avancarMes}
-          labelStyle={styles.navegacaoButtonText}
-          contentStyle={styles.navegacaoButtonContent}>
-          Próximo
-        </Button>
-      </Surface>
-
-      {/* Filtro de visualização */}
-      <Surface style={styles.filtroContainer} elevation={1}>
-        <Button
-          mode={exibirApenasComLocacao ? 'contained' : 'outlined'}
-          onPress={() => {
-            Vibration.vibrate(30);
-            setExibirApenasComLocacao(!exibirApenasComLocacao);
-          }}
-          icon={exibirApenasComLocacao ? 'eye' : 'eye-off'}
-          labelStyle={styles.filtroText}
-          contentStyle={styles.filtroButtonContent}>
-          {exibirApenasComLocacao ? 'Mostrando Apenas Dias Com Locação' : 'Mostrando Todos os Dias'}
-        </Button>
-      </Surface>
-
-      {/* Conteúdo */}
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -466,6 +415,58 @@ export default function AgendaScreen() {
             title="Puxe para atualizar"
           />
         }>
+        
+        {/* Cabeçalho de navegação */}
+        <Surface style={styles.navegacao} elevation={4}>
+          <Button
+            mode="text"
+            icon="chevron-left"
+            onPress={voltarMes}
+            labelStyle={styles.navegacaoButtonText}
+            contentStyle={styles.navegacaoButtonContent}>
+            Anterior
+          </Button>
+
+          <View style={styles.mesContainer}>
+            <Text style={styles.tituloMes}>{nomeMesFormatado}</Text>
+            <Text style={styles.anoTexto}>{anoAtual}</Text>
+            {!ehMesAtual && (
+              <Button
+                mode="text"
+                compact
+                onPress={irParaMesAtual}
+                labelStyle={styles.voltarHojeText}>
+                Ir para Hoje
+              </Button>
+            )}
+          </View>
+
+          <Button
+            mode="text"
+            icon="chevron-right"
+            onPress={avancarMes}
+            labelStyle={styles.navegacaoButtonText}
+            contentStyle={[styles.navegacaoButtonContent, { flexDirection: 'row-reverse' }]}>
+            Próximo
+          </Button>
+        </Surface>
+
+        {/* Filtro de visualização */}
+        <Surface style={styles.filtroContainer} elevation={1}>
+          <Button
+            mode={exibirApenasComLocacao ? 'contained' : 'outlined'}
+            onPress={() => {
+              Vibration.vibrate(30);
+              setExibirApenasComLocacao(!exibirApenasComLocacao);
+            }}
+            icon={exibirApenasComLocacao ? 'eye' : 'eye-off'}
+            labelStyle={styles.filtroText}
+            contentStyle={styles.filtroButtonContent}>
+            {exibirApenasComLocacao ? 'Apenas com Locação' : 'Todos os Dias'}
+          </Button>
+        </Surface>
+
+        {/* Renderização dos dias */}
         {renderizarDiasDoMes()}
       </ScrollView>
 
@@ -483,7 +484,6 @@ export default function AgendaScreen() {
   );
 }
 
-// Estilos otimizados para acessibilidade (mantidos igual ao anterior)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -491,15 +491,22 @@ const styles = StyleSheet.create({
   },
   navegacao: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    justifyContent: 'center', // Ajustado para 'center'
     alignItems: 'center',
-    marginHorizontal: 16,
     marginTop: 16,
+    marginHorizontal: 16,
     marginBottom: 12,
     backgroundColor: 'white',
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 8,
+    gap: 15, // Aumentado o gap para espaçar melhor
+  },
+  mesContainer: {
+    alignItems: 'center',
+    width: '100%', // Força largura total para cair na linha caso precise
+    marginBottom: 4,
   },
   navegacaoButtonText: {
     fontSize: 15,
@@ -508,14 +515,11 @@ const styles = StyleSheet.create({
   navegacaoButtonContent: {
     paddingHorizontal: 4,
   },
-  mesContainer: {
-    alignItems: 'center',
-    flex: 1,
-  },
   tituloMes: {
     fontSize: 22,
     fontWeight: 'bold',
     color: '#6200ee',
+    textAlign: 'center',
   },
   anoTexto: {
     fontSize: 16,
@@ -534,13 +538,12 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   filtroText: {
-    fontSize: 14,
+    fontSize: 13,
   },
   filtroButtonContent: {
     paddingVertical: 4,
   },
   scrollContent: {
-    paddingHorizontal: 16,
     paddingBottom: 100,
   },
   loadingContainer: {
@@ -556,6 +559,7 @@ const styles = StyleSheet.create({
   },
   emptyCard: {
     marginTop: 40,
+    marginHorizontal: 16,
     padding: 20,
     backgroundColor: 'white',
   },
@@ -578,6 +582,7 @@ const styles = StyleSheet.create({
   },
   diaContainer: {
     marginBottom: 24,
+    marginHorizontal: 16,
     backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
@@ -626,9 +631,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   veiculoInfo: {
     flex: 1,
+    minWidth: 150,
     marginRight: 12,
   },
   carro: {
@@ -691,9 +699,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     marginBottom: 12,
+    flexWrap: 'wrap',
   },
   botaoGrande: {
     flex: 1,
+    minWidth: 120,
   },
   botaoTexto: {
     fontSize: 16,
@@ -708,10 +718,12 @@ const styles = StyleSheet.create({
   actionsContainer: {
     flexDirection: 'row',
     gap: 12,
+    flexWrap: 'wrap',
   },
   actionButton: {
     flex: 1,
     backgroundColor: '#fff',
+    minWidth: 100,
   },
   actionButtonText: {
     fontSize: 16,
